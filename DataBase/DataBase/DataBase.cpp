@@ -1,4 +1,4 @@
-п»ї//simple database in C++
+//simple database in C++. Store dates - events. Can perform comands Add <date> <event>, Find <date>, Del <date>, Del <date> <event>, Print.
 
 #include <string>
 #include <sstream>
@@ -11,12 +11,9 @@
 
 using namespace std;
 
-struct Day {
+struct Year {
     int value;
-    explicit Day(int new_value) {
-        if (new_value > 31 || new_value < 0) {
-            throw invalid_argument("");
-        }
+    explicit Year(int new_value) {
         value = new_value;
     }
 };
@@ -24,19 +21,23 @@ struct Day {
 struct Month {
     int value;
     explicit Month(int new_value) {
-        if (new_value > 12 || new_value < 0) {
-            throw invalid_argument("");
+        if (new_value > 12 || new_value < 1) {
+            throw invalid_argument("Month value is invalid: " + to_string(new_value));
         }
         value = new_value;
     }
 };
 
-struct Year {
+struct Day {
     int value;
-    explicit Year(int new_value) {
+    explicit Day(int new_value) {
+        if (new_value > 31 || new_value < 1) {
+            throw invalid_argument("Day value is invalid: " + to_string(new_value));
+        }
         value = new_value;
     }
 };
+
 
 class Date {
 public:
@@ -89,15 +90,34 @@ bool operator<(const Date& lhs, const Date& rhs) {
 
 istream& operator>>(istream& stream, Date& date) {
     int year = 1, month = 1, day = 1;
+    string input_, trash;
     char del1, del2;
-    if (stream) {
-        stream >> year >> del1 >> month >> del2 >> day;
-    }
-    if (del1 != '-' || del2 != '-') {
-        throw invalid_argument("");
-    }
+    stream >> input_;
+    stringstream sstr(input_);
 
-    date = Date(Year(year), Month(month), Day(day));
+    if (sstr) {
+        sstr >> year >> del1 >> month >> del2 >> day;
+        if (sstr && !(sstr.good())) {
+            if (del1 == '-' && del2 == '-') {
+                Month month_(month);
+                date = Date(Year(year), month_, Day(day));
+            }
+            else {
+                sstr.setstate(ios_base::failbit);
+                throw invalid_argument("Wrong date format: " + input_);
+            }
+        }
+        else {
+            throw invalid_argument("Wrong date format: " + input_);
+        }
+    }
+    return sstr;
+}
+
+ostream& operator<<(ostream& stream, const Date& date) {
+    stream << setw(4) << setfill('0') << date.GetYear() <<
+        "-" << setw(2) << setfill('0') << date.GetMonth() <<
+        "-" << setw(2) << setfill('0') << date.GetDay();
     return stream;
 }
 
@@ -109,6 +129,8 @@ public:
     bool DeleteEvent(const Date& date, const string& event) {
         if (source[date].count(event)) {
             source[date].erase(event);
+            if (source[date].size() == 0)
+                source.erase(date);
             return true;
         }
         return false;
@@ -125,12 +147,10 @@ public:
     }
 
     void Print() const {
-        for (auto s : source) {
-            cout << setw(4) << setfill('0') << s.first.GetYear() << '-' << setw(2) << setfill('0') << s.first.GetMonth() << '-' << setw(2) << setfill('0') << s.first.GetDay() << ' ';
-            for (auto v : s.second) {
-                cout << v << ' ';
+        for (const auto& date : source) {
+            for (const auto &event : date.second) {
+                cout << date.first << ' ' << event << endl;
             }
-            cout << endl;
         }
     }
 
@@ -139,10 +159,7 @@ private:
 };
 
 void Parse_query(string& cmd, string& date, string& event, Database& db) {
-    if (cmd == "") {
-        return;
-    }
-    else if (cmd == "Add") {
+    if (cmd == "Add") {
         stringstream sstr(date);
         Date new_date;
         sstr >> new_date;
@@ -188,6 +205,8 @@ int main() {
     Database db;
     string command, cmd, date, event;
     while (getline(cin, command)) {
+        if (command == "")
+            continue;
         stringstream command_string(command);
         if (command_string.good()) {
             command_string >> cmd;
@@ -201,15 +220,17 @@ int main() {
                 }
             }
         }
-        // РЎС‡РёС‚Р°Р№С‚Рµ РєРѕРјР°РЅРґС‹ СЃ РїРѕС‚РѕРєР° РІРІРѕРґР° Рё РѕР±СЂР°Р±РѕС‚Р°Р№С‚Рµ РєР°Р¶РґСѓСЋ
+
+        // Считайте команды с потока ввода и обработайте каждую
         try {
             Parse_query(cmd, date, event, db);
         }
-        catch (exception) {
+        catch (const exception& ex) {
+            cout << ex.what() << endl;
             return 0;
         }
     }
 
-
     return 0;
 }
+
